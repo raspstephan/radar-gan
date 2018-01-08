@@ -1,26 +1,28 @@
 """
 Training of the networks
 """
-from keras.datasets import mnist
-import numpy as np
 from tqdm import tqdm
 from PIL import Image
-
-
-def prep_mnist(X):
-    X = (X.astype('float32') - 127.5) / 127.5
-    return np.expand_dims(X, -1)
+from collections import defaultdict
+from .utils import *
+import pdb
 
 
 def train(D, G, C, epochs, bs, batch_creation='complete_random',
-          latent_size=100, image_dir='./images/', exp_name='test'):
+          latent_size=100, image_dir='./images/', exp_name='test',
+          dataset='mnist', normalize_radar=False, remove_no_rain=True):
+    """Train function, returns training history containing the losses.
+    """
+    # Some initial setup
+    train_history = defaultdict(list)
 
-    # Get the data
-    (X_train, y_train), (X_test, y_test) = mnist.load_data()
-    # Normalize the data
-    X_train, X_test = (prep_mnist(X_train), prep_mnist(X_test))
+    (X_train, y_train), (X_test, y_test) = get_data(
+        dataset, normalize=normalize_radar, remove_no_rain=remove_no_rain
+    )
 
     n_samples = X_train.shape[0]
+    n_test = X_test.shape[0]
+    image_size = X_train.shape[1]
     n_batches = n_samples // bs
 
     for e in tqdm(range(epochs)):
@@ -33,7 +35,7 @@ def train(D, G, C, epochs, bs, batch_creation='complete_random',
 
         for b in range(n_batches):
 
-            # TRAIN DISCRIMINATOR
+            # STEP 1: TRAIN DISCRIMINATOR
             D.trainable = True
 
             # Get the real images
@@ -58,8 +60,7 @@ def train(D, G, C, epochs, bs, batch_creation='complete_random',
             # Train the discriminator
             dl.append(D.train_on_batch(X_concat, y_concat))
 
-
-            # TRAIN GENERATOR
+            # STEP 2: TRAIN GENERATOR
             D.trainable = False
 
             # Get noise input for twice the batch_size
@@ -68,24 +69,42 @@ def train(D, G, C, epochs, bs, batch_creation='complete_random',
             # Train the Generator
             gl.append(C.train_on_batch(latent_noise, np.array([1] * (2*bs))))
 
+        # COMPUTE LOSSES AFTER EACH EPOCH
+        # First up the mean losses during training
+        train_history['train_discriminator_loss'].append(np.mean(dl))
+        train_history['train_generator_loss'].append(np.mean(gl))
 
-        # TODO Test loss
+        # Then get the scores for the test set
+        latent_noise = np.random.uniform(-1, 1, (n_test, latent_size))
+        fake = G.predict(latent_noise, batch_size=bs)
+        X_concat = np.concatenate([X_test, fake])
+        y_concat = np.array([1] * n_test + [0] * n_test)
+        train_history['test_discriminator_loss'].append(
+            D.evaluate(X_concat, y_concat, batch_size=bs, verbose=0)
+        )
+        latent_noise = np.random.uniform(-1, 1, (2 * n_test, latent_size))
+        train_history['test_generator_loss'].append(
+            C.evaluate(latent_noise, [1] * (2*n_test), batch_size=bs,
+                       verbose=0)
+        )
 
-        # Create some sample images every epoch
-        latent_noise = np.random.uniform(-1, 1, (9, latent_size))
-        generated_images = np.squeeze(G.predict_on_batch(latent_noise))
+        # SAVE SOME IMAGES
+        str = (image_dir + '/' + exp_name + '_' +
+               'plot_epoch_{0:03d}_generated'.format(e))
+        if dataset == 'mnist':
+            # From https://github.com/lukedeo/keras-acgan/blob/master/mnist_acgan.py
+            img = (np.concatenate(
+                [fake[i*3:(i+1)*3, :, :, 0].reshape(-1, image_size)
+                 for i in range(3)],
+                axis=-1
+            ) * 127.5 + 127.5).astype(np.uint8)
+            Image.fromarray(img).save(str + '.png')
+        if dataset == 'radar':
+            np.save(str + '.npy', fake[:9])
 
-        # From https://github.com/lukedeo/keras-acgan/blob/master/mnist_acgan.py
-        img = (np.concatenate(
-            [generated_images[i*3:(i+1)*3].reshape(-1, 28) for i in range(3)],
-            axis=-1
-        ) * 127.5 + 127.5).astype(np.uint8)
-        Image.fromarray(img).save(image_dir + '/' + exp_name + '_' +
-            'plot_epoch_{0:03d}_generated.png'.format(e))
+    # TODO Save weights
 
-    # Save weights
-
-    return dl, gl
+    return train_history
 
 
 
