@@ -5,8 +5,8 @@
 # Imports
 from .models import *
 from .utils import *
-from collections import defaultdict
-from tqdm import tqdm
+from collections import defaultdict, OrderedDict
+from tqdm import tqdm_notebook as tqdm
 from PIL import Image
 import os
 import pickle
@@ -17,7 +17,7 @@ class GAN(object):
     """GAN class"""
     def __init__(self, latent_size=100, image_size=None, exp_id='test',
                  img_dir='./images/', model_dir='./saved_models/',
-                 wasserstein=False):
+                 wasserstein=False, verbose=0):
         """Initialize the variables"""
         # Initialize empty networks
         self.G = None
@@ -43,7 +43,13 @@ class GAN(object):
 
         # Training information
         self.epoch_counter = 0
-        self.train_history = defaultdict(list)
+        self.train_history = OrderedDict({
+            'train_discriminator_loss': [],
+            'train_generator_loss': [],
+            'test_discriminator_loss': [],
+            'test_generator_loss': [],
+        })
+        self.verbose = verbose
 
     def create_generator(self, **kwargs):
         """Create the generator network"""
@@ -85,38 +91,39 @@ class GAN(object):
                 'image_size mismatch.'
 
     def train(self, epochs, bs, train_D_separately=False,
-              noise_shape='uniform', n_disc=1):
+              noise_shape='uniform', n_disc_regular=None):
         """Training operation"""
         n_batches = self.n_train // bs
-        for e in tqdm(range(epochs)):
+        # Set n_disc defaults
+        if self.wasserstein and n_disc_regular is None: n_disc_regular = 5
+        if not self.wasserstein and n_disc_regular is None: n_disc = 1
+        if not self.wasserstein and n_disc_regular is not None:
+            n_disc = n_disc_regular
+        pbar = tqdm(total=epochs * n_batches)
+        for e in range(self.epoch_counter, self.epoch_counter + epochs):
             dl, gl = [], []
             for b in range(n_batches):
-                self.train_step(bs, dl, gl, train_D_separately, noise_shape,
-                                n_disc)
+                pbar.update(1)
+                if self.wasserstein:  # Train discriminator a lot sometimes
+                    eb = e*n_batches + b
+                    n_disc = 100 if eb < 25 or eb % 500 == 0 else n_disc_regular
+                dl, gl = self.train_step(bs, dl, gl, train_D_separately,
+                                         noise_shape, n_disc)
             self.epoch_counter += 1
 
             # END OF EPOCH. COMPUTE AVERAGE AND TEST LOSSES
             self.train_history['train_discriminator_loss'].append(np.mean(dl))
             self.train_history['train_generator_loss'].append(np.mean(gl))
-
-            fake = self.G.predict(
-                create_noise(self.n_test, self.latent_size, noise_shape),
-                batch_size=bs
-            )
-            X_concat = np.concatenate([self.X_test, fake])
-            y_concat = np.array([1] * self.n_test + [0] * self.n_test)
-            self.train_history['test_discriminator_loss'].append(
-                self.D.evaluate(X_concat, y_concat, batch_size=bs, verbose=0)
-            )
-            self.train_history['test_generator_loss'].append(
-                self.GD.evaluate(
-                    create_noise(2*self.n_test, self.latent_size, noise_shape),
-                    [1] * (2 * self.n_test),
-                    batch_size=bs, verbose=0
-                ))
+            fake = self.evaluate_test_losses(noise_shape, bs)
 
             # Save images
             self.save_images(fake)
+
+            # Update progressbar
+            pbar_dict = OrderedDict({k: v[-1] for k, v
+                                     in self.train_history.items()})
+            pbar.set_postfix(pbar_dict)
+        pbar.close()
 
     def train_step(self, bs, dl, gl, train_D_separately, noise_shape,
                    n_disc):
@@ -125,6 +132,7 @@ class GAN(object):
         # STEP 1: TRAIN DISCRIMINATOR
         self.D.trainable = True
 
+        if self.verbose > 0: print('n_disc:', n_disc)
         for i_disc in range(n_disc):
             # Get images
             real = self.X_train[np.random.randint(0, self.n_train, bs)]
@@ -137,22 +145,68 @@ class GAN(object):
             # Concatenate real and fake images and train the discriminator
             if train_D_separately:
                 # Train on real data first
-                tmp = self.D.train_on_batch(real, np.array([1] * bs))
+                tmp = self.D.train_on_batch(
+                    real, np.array(self.label('real') * bs)
+                )
                 # Then on fake data
-                tmp += self.D.train_on_batch(fake, np.array([0] * bs))
+                tmp += self.D.train_on_batch(
+                    fake, np.array(self.label('fake') * bs)
+                )
                 dl.append(tmp / 2.)
             else:
                 X_concat = np.concatenate([real, fake])
-                y_concat = np.array([1] * bs + [0] * bs)
+                y_concat = np.array(
+                    self.label('real') * bs + self.label('fake') * bs
+                )
                 dl.append(self.D.train_on_batch(X_concat, y_concat))
+
+            if self.wasserstein:
+                self.clip_D_weights()
 
         # STEP 2: TRAIN GENERATOR
         self.D.trainable = False
         gl.append(self.GD.train_on_batch(
             create_noise(2 * bs, self.latent_size, noise_shape),
-            np.array([1] * (2 * bs))
+            np.array(self.label('real') * (2 * bs))
         ))
         return dl, gl
+
+    def clip_D_weights(self):
+        c = 0.01
+        for l in self.D.layers:
+            weights = l.get_weights()
+            weights = [np.clip(w, -c, c) for w in weights]
+            l.set_weights(weights)
+
+    def evaluate_test_losses(self, noise_shape, bs):
+        """Compute losses for test set and returns some fake images"""
+        fake = self.G.predict(
+            create_noise(self.n_test, self.latent_size, noise_shape),
+            batch_size=bs
+        )
+        X_concat = np.concatenate([self.X_test, fake])
+        y_concat = np.array(
+            self.label('real') * self.n_test +
+            self.label('fake') * self.n_test
+        )
+        self.train_history['test_discriminator_loss'].append(
+            self.D.evaluate(X_concat, y_concat, batch_size=bs, verbose=0)
+        )
+        self.train_history['test_generator_loss'].append(
+            self.GD.evaluate(
+                create_noise(2 * self.n_test, self.latent_size, noise_shape),
+                self.label('real') * (2 * self.n_test),
+                batch_size=bs, verbose=0
+            ))
+        return fake
+
+    def label(self, s):
+        """Little helper function to return labels"""
+        assert s in ['real', 'fake'], 'Wrong string for label function.'
+        if self.wasserstein:
+            return [-1] if s == 'real' else [1]
+        else:
+            return [1] if s == 'real' else [0]
 
     def save_images(self, fake):
         """Saves some fake images"""

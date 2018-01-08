@@ -106,3 +106,4 @@ def create_noise(bs, latent_size, noise_shape='uniform'):
         raise ValueError('Wrong distribution for noise creation.')
 
 
+
