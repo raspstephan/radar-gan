@@ -14,27 +14,32 @@ from keras.optimizers import *
 from keras.models import *
 
 
+# Wasserstein loss function
+def wasserstein_loss(y_true, y_pred):
+    return K.mean(y_true * y_pred)
+
+
 # GENERATOR NETWORK
 # Auxiliary functions
 def upsample_block(x, filters, bn=False, kernel_size=5, activation='relu',
-                   init='glorot_normal'):
+                   init='glorot_uniform', dr=0):
     """
 
     """
     x = UpSampling2D(size=(2, 2))(x)
     x = Conv2D(filters, kernel_size=kernel_size, padding='same',
-               activation=activation, init=init)(x)
+               activation=activation, kernel_initializer=init)(x)
     if bn: x = BatchNormalization()(x)
+    if not dr == 0: x = Dropout(dr)(x)
     return x
 
 
 # Main function
 def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
                      activation='relu', bn=False, final_activation='tanh',
-                     kernel_size=5, final_bias=True, init='glorot_normal'):
+                     kernel_size=5, final_bias=True, init='glorot_uniform',
+                     dr=0):
     """DCGAN
-    To Do:
-    - initialization
     """
     if activation == 'LeakyReLU': activation = LeakyReLU()
 
@@ -43,18 +48,18 @@ def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
 
     # One dense layer, then reshape to channels
     x = Dense(filters[0] * (first_conv_size ** 2), activation=activation,
-              init=init)(inp)
+              kernel_initializer=init)(inp)
     if bn: x = BatchNormalization()(x)
     x = Reshape((first_conv_size, first_conv_size, filters[0]))(x)
 
     # Double the image size twice
     for f in filters:
         x = upsample_block(x, f, bn=bn, activation=activation,
-                           kernel_size=kernel_size, init=init)
+                           kernel_size=kernel_size, init=init, dr=dr)
 
     # Reduce to one channel for the final image
     outp = Conv2D(1, 1, padding='same', activation=final_activation,
-                  use_bias=final_bias, init=init)(x)
+                  use_bias=final_bias, kernel_initializer=init)(x)
 
     return Model(inputs=inp, outputs=outp)
 
@@ -62,10 +67,10 @@ def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
 # DISCRIMINATOR NETWORK
 # Auxiliary functions
 def conv_block(x, filters, type='regular', activation='relu', kernel_size=5,
-               dr=0, strides=2, bn=False, init='glorot_normal'):
+               dr=0, strides=2, bn=False, init='glorot_uniform'):
     if type == 'regular':
         x = Conv2D(filters, kernel_size=kernel_size, strides=strides,
-                   activation=activation, padding='same', init=init)(x)
+                   activation=activation, padding='same', kernel_initializer=init)(x)
         if bn: x = BatchNormalization()(x)
         if not dr == 0: x = Dropout(dr)(x)
     elif type == 'max_pool':
@@ -83,7 +88,7 @@ def create_discriminator(filters=(128, 64), strides=(2, 2), dr=0,
                          conv_type='regular', activation='relu',
                          image_size=28, kernel_size=5,
                          final_activation='sigmoid', bn=False,
-                         init='glorot_normal'):
+                         init='glorot_uniform'):
     """
     No bn ever in first convolution, from [arXiv/1511.06434]
     :return:
@@ -102,7 +107,7 @@ def create_discriminator(filters=(128, 64), strides=(2, 2), dr=0,
 
     # Final flattening and dense
     x = Flatten()(x)
-    outp = Dense(1, activation=final_activation, init=init)(x)
+    outp = Dense(1, activation=final_activation, kernel_initializer=init)(x)
 
     return Model(inputs=inp, outputs=outp)
 

@@ -97,7 +97,12 @@ def plot_stamps(data, normalize=False):
     plt.show()
 
 
-def create_noise(bs, latent_size):
-    return np.random.uniform(-1, 1, (bs, latent_size))
+def create_noise(bs, latent_size, noise_shape='uniform'):
+    if noise_shape == 'normal':
+        return np.random.normal(0, 1, (bs, latent_size))
+    elif noise_shape == 'uniform':
+        return np.random.uniform(-1, 1, (bs, latent_size))
+    else:
+        raise ValueError('Wrong distribution for noise creation.')
 
 
