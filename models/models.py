@@ -39,7 +39,7 @@ def upsample_block(x, filters, act_func, bn=False, kernel_size=5,
 def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
                      activation='relu', bn=False, final_activation='tanh',
                      kernel_size=5, final_bias=True, init='glorot_uniform',
-                     dr=0):
+                     dr=0, final_kernel_size=1):
     """DCGAN
     """
     if activation == 'LeakyReLU': 
@@ -63,8 +63,9 @@ def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
                            kernel_size=kernel_size, init=init, dr=dr)
 
     # Reduce to one channel for the final image
-    outp = Conv2D(1, 1, padding='same', activation=final_activation,
-                  use_bias=final_bias, kernel_initializer=init)(x)
+    outp = Conv2D(1, final_kernel_size, padding='same', 
+                  activation=final_activation, use_bias=final_bias, 
+                  kernel_initializer=init)(x)
 
     return Model(inputs=inp, outputs=outp)
 

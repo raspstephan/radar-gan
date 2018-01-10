@@ -41,7 +41,9 @@ def main(inargs):
             first_conv_size=inargs.G_first_conv_size, 
             activation=inargs.G_activation,
             bn=inargs.G_bn,
+            dr=inargs.G_dr,
             final_activation=inargs.G_final_activation,
+            final_kernel_size=inargs.G_final_kernel_size,
         )
         gan.create_discriminator(
             filters=inargs.D_filters,
@@ -61,6 +63,7 @@ def main(inargs):
         inargs.epochs,
         inargs.bs,
         inargs.train_D_separately,
+        inargs.noise_shape,
     )
     
     # Save model
@@ -167,6 +170,12 @@ if __name__ == '__main__':
         default=1,
         help='If 1, train real and fake samples separately.',
     )
+    p.add_argument(
+        '--noise_shape',
+        type=str,
+        default='uniform',
+        help='Latent noise shape. Default: uniform',
+    )
     
     # Generator settings
     p.add_argument(
@@ -198,11 +207,24 @@ if __name__ == '__main__':
         help='Use batch norm?',
     )
     p.add_argument(
+        '--G_dr',
+        type=float,
+        default=0,
+        help='Dropout ratio, default: 0',
+    )
+    p.add_argument(
         '--G_final_activation',
         type=str,
         default='tanh',
         help='Final activation function. '
              'Default: tanh',
+    )
+    p.add_argument(
+        '--G_final_kernel_size',
+        type=int,
+        default=1,
+        help='Final kernel size. '
+             'Default: 1',
     )
     
     # Discriminator settings

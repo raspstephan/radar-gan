@@ -1,0 +1,6 @@
+exp_id: radar10
+dataset: radar
+G_dr: 0.3
+G_final_activation: sigmoid
+G_first_conv_size: 8
+epochs: 300

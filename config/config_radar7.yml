@@ -1,0 +1,6 @@
+exp_id: radar7
+dataset: radar
+G_final_activation: sigmoid
+G_final_kernel_size: 3
+G_first_conv_size: 8
+epochs: 300

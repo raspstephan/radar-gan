@@ -1,0 +1,5 @@
+exp_id: radar9
+dataset: radar
+G_final_activation: relu
+G_first_conv_size: 8
+epochs: 300
