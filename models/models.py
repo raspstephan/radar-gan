@@ -21,14 +21,15 @@ def wasserstein_loss(y_true, y_pred):
 
 # GENERATOR NETWORK
 # Auxiliary functions
-def upsample_block(x, filters, bn=False, kernel_size=5, activation='relu',
+def upsample_block(x, filters, act_func, bn=False, kernel_size=5,
                    init='glorot_uniform', dr=0):
     """
 
     """
     x = UpSampling2D(size=(2, 2))(x)
     x = Conv2D(filters, kernel_size=kernel_size, padding='same',
-               activation=activation, kernel_initializer=init)(x)
+               kernel_initializer=init)(x)
+    x = act_func(x)
     if bn: x = BatchNormalization()(x)
     if not dr == 0: x = Dropout(dr)(x)
     return x
@@ -41,20 +42,24 @@ def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
                      dr=0):
     """DCGAN
     """
-    if activation == 'LeakyReLU': activation = LeakyReLU()
+    if activation == 'LeakyReLU': 
+        act_func = LeakyReLU()
+    else:
+        act_func = Activation(activation)
 
     # Random latent vector
     inp = Input(shape=(latent_size,))
 
     # One dense layer, then reshape to channels
-    x = Dense(filters[0] * (first_conv_size ** 2), activation=activation,
+    x = Dense(filters[0] * (first_conv_size ** 2), 
               kernel_initializer=init)(inp)
+    x = act_func(x)
     if bn: x = BatchNormalization()(x)
     x = Reshape((first_conv_size, first_conv_size, filters[0]))(x)
 
     # Double the image size twice
     for f in filters:
-        x = upsample_block(x, f, bn=bn, activation=activation,
+        x = upsample_block(x, f, act_func, bn=bn,
                            kernel_size=kernel_size, init=init, dr=dr)
 
     # Reduce to one channel for the final image
@@ -66,13 +71,16 @@ def create_generator(filters=(128, 64), latent_size=100, first_conv_size=7,
 
 # DISCRIMINATOR NETWORK
 # Auxiliary functions
-def conv_block(x, filters, type='regular', activation='relu', kernel_size=5,
+def conv_block(x, filters, act_func, type='regular', kernel_size=5,
                dr=0, strides=2, bn=False, init='glorot_uniform'):
+    
     if type == 'regular':
         x = Conv2D(filters, kernel_size=kernel_size, strides=strides,
-                   activation=activation, padding='same', kernel_initializer=init)(x)
+                   padding='same', kernel_initializer=init)(x)
+        x = act_func(x)
         if bn: x = BatchNormalization()(x)
         if not dr == 0: x = Dropout(dr)(x)
+    
     elif type == 'max_pool':
         x = Conv2D(filters, kernel_size=kernel_size, strides=1,
                           activation=activation, padding='same')(x)
@@ -93,7 +101,10 @@ def create_discriminator(filters=(128, 64), strides=(2, 2), dr=0,
     No bn ever in first convolution, from [arXiv/1511.06434]
     :return:
     """
-    if activation == 'LeakyReLU': activation = LeakyReLU()
+    if activation == 'LeakyReLU': 
+        act_func = LeakyReLU()
+    else:
+        act_func = Activation(activation)
 
     # Input with channels last (Tensorflow convention)
     inp = Input(shape=(image_size, image_size, 1))
@@ -101,7 +112,7 @@ def create_discriminator(filters=(128, 64), strides=(2, 2), dr=0,
     # Convolution blocks, decrease image size twice
     x = inp
     for i, (f, s) in enumerate(zip(filters, strides)):
-        x = conv_block(x, f, type=conv_type, activation=activation,
+        x = conv_block(x, f, act_func, type=conv_type,
                        kernel_size=kernel_size, dr=dr, strides=s,
                        bn=bn if i > 0 else False, init=init)
 

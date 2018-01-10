@@ -6,7 +6,7 @@
 from .models import *
 from .utils import *
 from collections import defaultdict, OrderedDict
-from tqdm import tqdm_notebook as tqdm
+from tqdm import tqdm
 from PIL import Image
 import os
 import pickle
@@ -58,7 +58,10 @@ class GAN(object):
     def create_discriminator(self, **kwargs):
         """Create the discriminator network"""
         assert self.image_size is not None, 'Define image_size first!'
-        self.D = create_discriminator(image_size=self.image_size, **kwargs)
+        self.D = create_discriminator(
+            image_size=self.image_size, 
+            final_activation = 'linear' if self.wasserstein else 'sigmoid',
+            **kwargs)
 
     def compile(self):
         """Compile the networks and create the combined network"""
@@ -99,11 +102,11 @@ class GAN(object):
         if not self.wasserstein and n_disc_regular is None: n_disc = 1
         if not self.wasserstein and n_disc_regular is not None:
             n_disc = n_disc_regular
-        pbar = tqdm(total=epochs * n_batches)
+        if self.verbose > 0: pbar = tqdm(total=epochs * n_batches)
         for e in range(self.epoch_counter, self.epoch_counter + epochs):
             dl, gl = [], []
             for b in range(n_batches):
-                pbar.update(1)
+                if self.verbose > 0: pbar.update(1)
                 if self.wasserstein:  # Train discriminator a lot sometimes
                     eb = e*n_batches + b
                     n_disc = 100 if eb < 25 or eb % 500 == 0 else n_disc_regular
@@ -120,10 +123,11 @@ class GAN(object):
             self.save_images(fake)
 
             # Update progressbar
-            pbar_dict = OrderedDict({k: v[-1] for k, v
-                                     in self.train_history.items()})
-            pbar.set_postfix(pbar_dict)
-        pbar.close()
+            if self.verbose > 0:
+                pbar_dict = OrderedDict({k: v[-1] for k, v
+                                         in self.train_history.items()})
+                pbar.set_postfix(pbar_dict)
+        if self.verbose > 0: pbar.close()
 
     def train_step(self, bs, dl, gl, train_D_separately, noise_shape,
                    n_disc):
@@ -230,5 +234,5 @@ class GAN(object):
         self.D.save(s + 'D.h5')
         self.GD.save(s + 'GD.h5')
         # Save training history
-        with open(s + 'history.pkl') as f:
+        with open(s + 'history.pkl', 'wb') as f:
             pickle.dump(self.train_history, f)

@@ -6,6 +6,9 @@ import matplotlib
 from skimage.measure import block_reduce
 import seaborn as sns
 sns.set_style('white')
+import pickle
+from PIL import Image
+from glob import glob
 
 
 def limit_mem():
@@ -15,6 +18,11 @@ def limit_mem():
 
 
 def plot_losses(train_history):
+    if type(train_history) == str:
+        fn = './saved_models/%s_history.pkl' % train_history
+        with open(fn, 'rb') as f:
+            train_history = pickle.load(f)
+            
     plt.plot(train_history['train_discriminator_loss'],
              label='train discriminator loss')
     plt.plot(train_history['train_generator_loss'],
@@ -96,6 +104,20 @@ def plot_stamps(data, normalize=False):
         ax.imshow(data[i], cmap=cmap, norm=norm)
     plt.show()
 
+
+def plot_mnist_progression(exp_id):
+    img_fns = sorted(glob('./images/%s*' % exp_id))
+    n_cols = 3
+    n_rows = int(np.ceil(len(img_fns) / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(10, 3*n_rows))
+    axes_flat = list(np.ravel(axes))
+    for i, (fn, ax) in enumerate(zip(img_fns, axes_flat)):
+        I = Image.open(fn)
+        ax.imshow(I, cmap='gray')
+        ax.set_title('After %i epochs' % (i+1))
+    plt.tight_layout()
+    plt.show()
+    
 
 def create_noise(bs, latent_size, noise_shape='uniform'):
     if noise_shape == 'normal':
