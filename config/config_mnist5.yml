@@ -1,0 +1,3 @@
+exp_id: mnist5
+D_dr: 0.2
+epochs: 40

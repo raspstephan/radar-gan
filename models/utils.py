@@ -53,7 +53,7 @@ def un_log_normalize(x, c=1e-2):
 
 
 def get_data(dataset, validation_split=0.2, normalize=False,
-             remove_no_rain=True, halve_radar=False):
+             remove_no_rain=True, halve_radar=False, data_dir='/local/S.Rasp/tmp/'):
 
     if dataset == 'mnist':
         (X_train, y_train), (X_test, y_test) = keras.datasets.mnist.load_data()
@@ -62,7 +62,7 @@ def get_data(dataset, validation_split=0.2, normalize=False,
         return X_train, X_test
 
     if dataset == 'radar':
-        radar_data = np.load('/local/S.Rasp/tmp/radar_prepped.npy')
+        radar_data = np.load(data_dir + 'radar_prepped.npy')
 
         if halve_radar:
             radar_data = halve_imsize(radar_data)
@@ -117,6 +117,13 @@ def plot_mnist_progression(exp_id):
         ax.set_title('After %i epochs' % (i+1))
     plt.tight_layout()
     plt.show()
+    
+def plot_radar_progression(exp_id):
+    img_fns = sorted(glob('./images/%s*' % exp_id))
+    for i, fn in enumerate(img_fns):
+        if i % 10 == 0:
+            print('Epoch:', i + 1)
+            plot_stamps(np.squeeze(np.load(fn)), normalize=True)
     
 
 def create_noise(bs, latent_size, noise_shape='uniform'):

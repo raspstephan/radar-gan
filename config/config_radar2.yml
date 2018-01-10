@@ -1,0 +1,6 @@
+exp_id: radar2
+wasserstein: True
+dataset: radar
+G_final_activation: sigmoid
+G_first_conv_size: 8
+epochs: 300

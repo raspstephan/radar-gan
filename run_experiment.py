@@ -22,6 +22,7 @@ def main(inargs):
         inargs.dataset,
         normalize=inargs.normalize,
         halve_radar=inargs.halve_radar,
+        data_dir=inargs.data_dir,
     )
     
     # Define networks

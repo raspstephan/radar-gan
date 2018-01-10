@@ -136,7 +136,6 @@ class GAN(object):
         # STEP 1: TRAIN DISCRIMINATOR
         self.D.trainable = True
 
-        if self.verbose > 0: print('n_disc:', n_disc)
         for i_disc in range(n_disc):
             # Get images
             real = self.X_train[np.random.randint(0, self.n_train, bs)]

@@ -1,0 +1,9 @@
+exp_id: radar5
+dataset: radar
+halve_radar: 0
+G_final_activation: sigmoid
+G_first_conv_size: 8
+epochs: 500
+G_filters: [512, 256, 128]
+D_filters: [64, 128, 256, 512]
+D_strides: [2, 2, 2, 2]
