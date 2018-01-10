@@ -97,6 +97,8 @@ class GAN(object):
               noise_shape='uniform', n_disc_regular=None):
         """Training operation"""
         n_batches = self.n_train // bs
+        save_interval = 1 if inargs.dataset == 'mnist' else 10
+        
         # Set n_disc defaults
         if self.wasserstein and n_disc_regular is None: n_disc_regular = 5
         if not self.wasserstein and n_disc_regular is None: n_disc = 1
@@ -120,7 +122,8 @@ class GAN(object):
             fake = self.evaluate_test_losses(noise_shape, bs)
 
             # Save images
-            self.save_images(fake)
+            if e % save_interval == 0:
+                self.save_images(fake)
 
             # Update progressbar
             if self.verbose > 0:
@@ -214,7 +217,7 @@ class GAN(object):
     def save_images(self, fake):
         """Saves some fake images"""
         s = (self.img_dir + '/' + self.exp_id + '_' +
-               'plot_epoch_{0:03d}_generated'.format(self.epoch_counter))
+               'plot_epoch_{0:04d}_generated'.format(self.epoch_counter))
         if self.dataset == 'mnist':
             # From https://github.com/lukedeo/keras-acgan/blob/master/mnist_acgan.py
             img = (np.concatenate(

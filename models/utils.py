@@ -9,6 +9,8 @@ sns.set_style('white')
 import pickle
 from PIL import Image
 from glob import glob
+from .models import wasserstein_loss
+import os
 
 
 def limit_mem():
@@ -49,7 +51,7 @@ def log_normalize(x, c=1e-2):
 
 
 def un_log_normalize(x, c=1e-2):
-    return 10 * (np.exp(x + np.log(c)) - c)
+    return np.exp(x * 10 + np.log(c)) - c
 
 
 def get_data(dataset, validation_split=0.2, normalize=False,
@@ -118,13 +120,18 @@ def plot_mnist_progression(exp_id):
     plt.tight_layout()
     plt.show()
     
-def plot_radar_progression(exp_id):
+def plot_radar_progression(exp_id, last2=True):
     img_fns = sorted(glob('./images/%s*' % exp_id))
-    for i, fn in enumerate(img_fns):
-        if i % 10 == 0:
-            print('Epoch:', i + 1)
-            plot_stamps(np.squeeze(np.load(fn)), normalize=True)
+    if last2:
+        idxs = [len(img_fns)-2, len(img_fns)-1]
+    else:
+        idxs = range(0, len(img_fns), 10)
+    for i in idxs:
+        fn = img_fns[i]
+        print('Epoch:', i + 1)
+        plot_stamps(np.squeeze(np.load(fn)), normalize=True)
     
+
 
 def create_noise(bs, latent_size, noise_shape='uniform'):
     if noise_shape == 'normal':
