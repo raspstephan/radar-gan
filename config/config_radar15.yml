@@ -1,0 +1,8 @@
+exp_id: radar15
+wasserstein: True
+noise_shape: normal
+dataset: radar
+G_final_activation: relu
+G_final_kernel_size: 3
+G_first_conv_size: 8
+epochs: 2000

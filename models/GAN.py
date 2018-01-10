@@ -97,7 +97,7 @@ class GAN(object):
               noise_shape='uniform', n_disc_regular=None):
         """Training operation"""
         n_batches = self.n_train // bs
-        save_interval = 1 if inargs.dataset == 'mnist' else 10
+        save_interval = 1 if self.dataset == 'mnist' else 10
         
         # Set n_disc defaults
         if self.wasserstein and n_disc_regular is None: n_disc_regular = 5
