@@ -1,0 +1,9 @@
+exp_id: radar11
+wasserstein: True
+noise_shape: normal
+dataset: radar
+G_final_activation: sigmoid
+G_final_kernel_size: 3
+G_first_conv_size: 8
+G_dr: 0.2
+epochs: 2000

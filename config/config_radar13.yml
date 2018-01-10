@@ -1,0 +1,13 @@
+exp_id: radar13
+wasserstein: True
+noise_shape: normal
+dataset: radar
+halve_radar: 0
+G_final_activation: sigmoid
+G_final_kernel_size: 3
+G_first_conv_size: 8
+G_dr: 0.2
+epochs: 2000
+G_filters: [512, 256, 128]
+D_filters: [64, 128, 256, 512]
+D_strides: [2, 2, 2, 2]
